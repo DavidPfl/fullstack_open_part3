@@ -50,6 +50,11 @@ let persons = [
     }
 ]
 
+
+app.get('/', (req, res) => {
+    res.send('<h1> Hello, this is the main page. Go to /api/persons to see something.</h1>')
+})
+
 app.get('/api/persons', (req,res) => {
     res.json(persons)
 })

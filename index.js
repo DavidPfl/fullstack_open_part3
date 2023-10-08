@@ -25,7 +25,7 @@ const customLogger = morgan((tokens, req, res) => {
 
 app.use(customLogger)
 //app.use(morgan(':method :body'))
-const PORT = 3001
+const PORT = process.env.PORT || 3001
 
 let persons = [
     { 

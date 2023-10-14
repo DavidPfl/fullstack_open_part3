@@ -1,13 +1,25 @@
 const express = require('express')
 const morgan = require('morgan')
 const cors = require('cors')
+require('dotenv').config()
+
+const Person = require('./models/person.js')
+
+const mongoose = require('mongoose')
+
 const app = express()
 app.use(express.json())
 app.use(cors())
 app.use(express.static('dist'))
 
-morgan.token('body', (req) => {
+const newPerson = process.argv[3]
+const newNumber = process.argv[4]
+const url = process.env.MONGODB_URI
     
+mongoose.set('strictQuery', false)
+mongoose.connect(url)
+    
+morgan.token('body', (req) => {
     return(JSON.stringify(req.body))
 })
 
@@ -25,7 +37,6 @@ const customLogger = morgan((tokens, req, res) => {
   })
 
 app.use(customLogger)
-//app.use(morgan(':method :body'))
 const PORT = process.env.PORT || 3001
 
 let persons = [
@@ -51,13 +62,10 @@ let persons = [
     }
 ]
 
-
-app.get('/', (req, res) => {
-    res.send('<h1> Hello, this is the main page. Go to /api/persons to see something.</h1>')
-})
-
 app.get('/api/persons', (req,res) => {
-    res.json(persons)
+    Person.find({}).then(person=>{
+        res.json(person)  
+    })
 })
 
 app.get('/info', (req, res) => {
@@ -87,16 +95,23 @@ app.post('/api/persons',(req, res) => {
     const newName = req.body.name
     const newNumber = req.body.number
     if (newName && newNumber) {
-        if (persons.some(person=>person.name===newName)) {
-            return res.status(403).send(`Person ${newName} already exists.`)
-        }
-        const newPerson = {
-            id: createNewId(),
+        // if (persons.some(person=>person.name===newName)) {
+        //     return res.status(403).send(`Person ${newName} already exists.`)
+        // }
+        const newPerson = new Person({
             number: newNumber,
             name: newName
-        }
-        persons = persons.concat(newPerson)
-        res.json(newPerson)
+        })
+        // {
+        //     id: createNewId(),
+        //     number: newNumber,
+        //     name: newName
+        // }
+        // persons = persons.concat(newPerson)
+        newPerson.save().then(savedPerson=>{
+            res.json(savedPerson)
+        })
+        // res.json(newPerson)
     } else {
         res.status(400).send("Name or number missing")
     }

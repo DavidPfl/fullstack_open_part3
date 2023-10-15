@@ -8,9 +8,10 @@ const Person = require('./models/person.js')
 const mongoose = require('mongoose')
 
 const app = express()
+app.use(express.static('dist'))
 app.use(express.json())
 app.use(cors())
-app.use(express.static('dist'))
+
 
 const newPerson = process.argv[3]
 const newNumber = process.argv[4]
@@ -37,6 +38,7 @@ const customLogger = morgan((tokens, req, res) => {
   })
 
 app.use(customLogger)
+
 const PORT = process.env.PORT || 3001
 
 let persons = [
@@ -62,6 +64,16 @@ let persons = [
     }
 ]
 
+const errorHandler = (error, request, response, next) => {
+    console.log('You landed in the errorHandler method');
+    console.error(error.message)
+
+    if (error.name === 'CastError') {
+        return response.status(400).send({error: 'malformatted id'})
+    }
+    next(error)
+}
+
 app.get('/api/persons', (req,res) => {
     Person.find({}).then(person=>{
         res.json(person)  
@@ -70,52 +82,62 @@ app.get('/api/persons', (req,res) => {
 
 app.get('/info', (req, res) => {
     const now = new Date()
-        res.send(`<p>Phonebook has info for ${persons.length} people</p> <br/>
-        ${now}`)
+    Person.find({})
+        .then(result => {
+            res.send(`<p>Phonebook has info for ${result.length} people</p> <br/>
+            ${now}`)
+        })
 })
 
-app.get('/api/persons/:id', (req, res) => {
-    const personId = Number(req.params.id)
-    const person = persons.find(person=>person.id===personId)
-    if (person) {
-        return res.json(person)
+app.get('/api/persons/:id', (req, res, next) => {
+    const personId = req.params.id
+    Person.findById(personId)
+    .then(result=>{
+        if (result) {
+            res.json(result)
+        } else {
+            res.status(404).end()
+        }
+    })
+    .catch(error =>{
+        console.log('You landed in the catch');
+        next(error)
     }
-    res.status(404).send(`Person with id ${personId} not found`)
+        )
 })
 
 app.delete('/api/persons/:id', (req, res) => {
-    const personId = Number(req.params.id)
-    persons = persons.filter(person=>person.id!==personId)
+    const personId = req.params.id
+    Person.findByIdAndDelete(personId).then(result=>res.status(204).end())
     res.status(204).end()
 })
-
-const createNewId = () => Math.floor(Math.random() * 100000)
 
 app.post('/api/persons',(req, res) => {
     const newName = req.body.name
     const newNumber = req.body.number
     if (newName && newNumber) {
-        // if (persons.some(person=>person.name===newName)) {
-        //     return res.status(403).send(`Person ${newName} already exists.`)
-        // }
         const newPerson = new Person({
             number: newNumber,
             name: newName
         })
-        // {
-        //     id: createNewId(),
-        //     number: newNumber,
-        //     name: newName
-        // }
-        // persons = persons.concat(newPerson)
-        newPerson.save().then(savedPerson=>{
+        newPerson.save().then(savedPerson => {
             res.json(savedPerson)
         })
-        // res.json(newPerson)
     } else {
         res.status(400).send("Name or number missing")
     }
 })
+
+app.put('/api/persons/:id', (req, res) => {
+    const personId = req.params.id
+    const newNumber = req.body.number
+    Person.findByIdAndUpdate(personId, {number: newNumber}, {new: true})
+        .then(result => {
+            res.json(result)
+        })
+})
+
+app.use(errorHandler)
 
 app.listen(PORT, ()=> {
     console.log(`Now running on PORT ${PORT}`)
